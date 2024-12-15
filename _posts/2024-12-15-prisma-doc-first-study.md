@@ -6,7 +6,7 @@ This is my notes on the official doc
 
 ## What is Prisma
 
-Company that provides tools to work with databases
+Company that provides tools to work with databases (open source Apache 2.0)
 - Connection pooling
 - Caching
 - More...
