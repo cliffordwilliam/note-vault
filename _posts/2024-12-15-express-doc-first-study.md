@@ -6,7 +6,7 @@ This is my notes from the official doc
 
 ## What is Express?
 
-Node.js web app framework
+Node.js web app framework (open source MIT)
 
 ## Installing
 
