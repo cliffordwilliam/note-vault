@@ -280,6 +280,12 @@ Post
   - Laterst tutorials about Prisma ORM
 - Prisma Studio?
   - Visual editor for your database data, run `npx prisma studio` to run it on a port
-- More...
+- Prisma Optimize provides recommendations to make queries faster!
+- Prisma ORM example
+  - Next.js + REST API
+  - Next.js + GraphQL API
+  - GraphQL server + `@apollo/server`
+  - Simple REST API with Express.JS
+  - Simple gRPC API
 
 [Ref](https://www.prisma.io/docs/getting-started/setup-prisma/start-from-scratch/relational-databases/next-steps)
