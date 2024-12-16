@@ -16,7 +16,7 @@ Why not just use `Express`?
 - NestJS provides abstraction (opinionated)! (like Next.js to React)
 - NestJS provides **architecture**! (similar to Angular's)
 - Built-in TypeScript
-- Built-in code eslint & prettier (from CLI scaffolding only)
+- Built-in installed eslint & prettier (from CLI scaffolding only)
 
 Note:
 - eslint -> linter -> no unused imports, ...
@@ -51,7 +51,7 @@ service: has methods
 controller: has routes
 spec: unit test
 module: root
-main: entry (creates NestJS instance, HTTP server, insert to port)
+main: entry (creates NestJS instance, start HTTP server, insert to port)
 
 main.ts
 ```ts
@@ -64,6 +64,8 @@ async function bootstrap() {
 }
 bootstrap();
 ```
+
+Note: Pass a type to create method to access either Express / Fastify API
 
 Run the app
 ```bash
@@ -79,7 +81,7 @@ npm run start:dev
 
 Has built-in linting and formatting
 Has IDE integration with official extensions
-Or manual calls
+Or manual script calls
 ```bash
 # Lint and autofix with eslint
 $ npm run lint
@@ -90,10 +92,8 @@ $ npm run format
 
 ## Controllers
 
-TODO: Read this!
-
 What does it do?
-- The router (end points)
+- Routes (end points)
 
 Shortcut: CRUD controller + validation
 ```bash
@@ -111,12 +111,16 @@ export class CatsController {
 }
 ```
 
-Why decorators?
-- Decorators associate classes with required metadata
-  - Allows Nest to create a routing map (tie requests to the corresponding controllers)
+Shortcut: Make 1 controller
+```bash
+nest g controller [name]
+```
 
-Explanations:
-- @Controller() defines controller
-- 'cats': **path prefix**, set this controller to handle
-  - cats/id
-  - cats/login
+Why decorator?
+- Decorator binds class with metadata
+  - Lets Nest bind request to controller (routing map)
+
+Anatomy:
+- `@Controller()`: defines controller
+- **Path prefix**: group routes, e.g. `cats` for /cats related endpoints
+- `@Get`: HTTP method
