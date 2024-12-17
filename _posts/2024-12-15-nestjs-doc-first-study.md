@@ -661,9 +661,190 @@ This is a function
 - Also have `next()`
 - Same as Express middleware
 
+Note
+- With Express platform
+  - `json`, `urlencoded` & `body-parser` are default middleware
+  - can customize it with `MiddlewareConsumer`
+    - turn off global middleware, set `bodyParser` to false in `NestFactory.create()`
+
 What does it do?
 - Run any code
 - Change req and res between client and module's controllers
 - Can end req res cycle
 - Call next middleware in stack
 - **If this middleware func does not end req res cycle, must call `next()` to pass to next middleware stack, or req hangs.**
+
+How to use it?
+- Function
+- Class + `@Injectable`, implement the `NestMiddleware` interface
+```ts
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Request, Response, NextFunction } from 'express';
+
+@Injectable()
+export class LoggerMiddleware implements NestMiddleware {
+  use(req: Request, res: Response, next: NextFunction) {
+    console.log('Request...');
+    next();
+  }
+}
+```
+
+Dependency injection
+Fully supports dependency injection like providers & controllers
+- Can inject dependencies in the same module via constructor
+
+Applying middleware
+Apply in module using `configure()` (can be async inside it), module with interface must use `NestModule` interface
+Set up `LoggerMiddleware` in `AppModule` level
+- for `/cats` route in `CatsController`
+```ts
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { CatsModule } from './cats/cats.module';
+
+@Module({
+  imports: [CatsModule],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(LoggerMiddleware)
+      .forRoutes('cats');
+  }
+}
+```
+
+Restrict to a req method
+- Pass obj with router path and method to `forRoutes()`
+```ts
+import { Module, NestModule, RequestMethod, MiddlewareConsumer } from '@nestjs/common';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { CatsModule } from './cats/cats.module';
+
+@Module({
+  imports: [CatsModule],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(LoggerMiddleware)
+      .forRoutes({ path: 'cats', method: RequestMethod.GET });
+  }
+}
+```
+Note, the path value can use wilcard pattern
+- match
+  - abcd
+  - ab ... cd
+```ts
+
+forRoutes({
+  path: 'ab*cd',
+  method: RequestMethod.ALL,
+});
+
+```
+
+Middleware consumer
+Helper class, has methods to manage middleware, chainable, `fourRoutes()` can take
+- single str
+- multi str
+- `RouteInfo` obj
+- controller class
+- multi controller class
+
+Most often you pass multi controller with comma delimiters
+```ts
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { CatsModule } from './cats/cats.module';
+import { CatsController } from './cats/cats.controller';
+
+@Module({
+  imports: [CatsModule],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(LoggerMiddleware)
+      .forRoutes(CatsController);
+  }
+}
+```
+Note
+- `apply()` may take single / multi middlewares
+
+Excluding routes
+Use `exclude()`, it takes
+- single str
+- multi str
+- `RouteInfo`
+- wildcard also
+```ts
+consumer
+  .apply(LoggerMiddleware)
+  .exclude(
+    { path: 'cats', method: RequestMethod.GET },
+    { path: 'cats', method: RequestMethod.POST },
+    'cats/(.*)',
+  )
+  .forRoutes(CatsController);
+```
+Here, this middleware is binded to all route in `CatsController` except the one in `exclude()`
+
+Functional middleware
+if middleware does not have
+- many methods
+- dependencies
+  - then just use functional middleware (recommended)
+```ts
+import { Request, Response, NextFunction } from 'express';
+
+export function logger(req: Request, res: Response, next: NextFunction) {
+  console.log(`Request...`);
+  next();
+};
+```
+
+this is how to use it in root `AppModule`
+```ts
+consumer
+  .apply(logger)
+  .forRoutes(CatsController);
+```
+
+Multiple middleware
+need sequential middleware? just list with comma delimiter
+```ts
+consumer.apply(cors(), helmet(), logger).forRoutes(CatsController);
+```
+
+Global middleware
+Bind 1 middleware to all routes? use `use()` from `INestApplication`
+```ts
+const app = await NestFactory.create(AppModule);
+app.use(logger);
+await app.listen(process.env.PORT ?? 3000);
+```
+
+Note (not sure what this is but might be important)
+Accessing the DI container in global middleware is not possible
+- use `functional middleware` in `app.use()`
+- or use class middleware and consume it with `.forRoutes('*')` with `AppModule`
+
+Exception filters
+This catch all unhandled exceptions in app
+- sends user friendly res, using `global exception filter`, handles
+  - `HttpException` and its sub class
+    - Exception unrecognized? (not `HttpException` or its sub class)
+      - built-in generates JSON res
+```ts
+{
+  "statusCode": 500,
+  "message": "Internal server error"
+}
+```
+Note
+- Partial support for `http-errors`, throw exceptions with `statusCode` + `message` will be used instead of `InternalServerErrorException`
+TODO
