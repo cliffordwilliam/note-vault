@@ -833,7 +833,7 @@ Accessing the DI container in global middleware is not possible
 - use `functional middleware` in `app.use()`
 - or use class middleware and consume it with `.forRoutes('*')` with `AppModule`
 
-Exception filters
+## Exception filters
 This catch all unhandled exceptions in app
 - sends user friendly res, using `global exception filter`, handles
   - `HttpException` and its sub class
@@ -847,4 +847,208 @@ This catch all unhandled exceptions in app
 ```
 Note
 - Partial support for `http-errors`, throw exceptions with `statusCode` + `message` will be used instead of `InternalServerErrorException`
-TODO
+
+Throwing standard exceptions
+use built-in `HttpException` class from `@nestjs/common`. For HTTP REST API app, best to sent standart HTTP res obj for errors
+```ts
+@Get()
+async findAll() {
+  throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
+}
+```
+The above use the helper enum from `@nestjs/common` (recommended to always use this helper)
+
+This is what the res looks like
+```json
+{
+  "statusCode": 403,
+  "message": "Forbidden"
+}
+```
+
+`HttpExeption` takes 2 args
+- response: JSON body, u can pass:
+  - str: update only the message prop
+  - obj: update entire json body (NestJS serialize obj and returns it as res (json))
+  - option: optional, define cause, use this to log what cause this to be thrown
+- status: HTTP status code
+
+res (json) body props
+- statusCode: defaults to status arg above
+- message: short desc based on above status arg
+
+This is an example of using the optional cause arg
+```ts
+@Get()
+async findAll() {
+  try {
+    await this.service.findAll()
+  } catch (error) {
+    throw new HttpException({
+      status: HttpStatus.FORBIDDEN,
+      error: 'This is a custom message',
+    }, HttpStatus.FORBIDDEN, {
+      cause: error
+    });
+  }
+}
+```
+
+This is how the res looks like
+```ts
+{
+  "status": 403,
+  "error": "This is a custom message"
+}
+```
+
+Custom exceptions
+You can write custom exception, but I am only interested in using the built-in Nest HTTP exception. So I skip this
+
+Built-in HTTP exceptions
+Nest has other standard exceptions that inherits `HttpException` all exposed in `@nestjs/common` package, check it out here
+[Ref](https://docs.nestjs.com/exception-filters)
+
+Exception filters
+Built-in exception filter auto handle cases, if you want to add log or diff json schema dynamically, you can use exception filter. Not interested, skip
+
+Argument host
+This is just explaining the argument used in making your own exception filter, skipping this too
+
+Binding filters
+This is just how to bind your custom filter to a route in a controller
+
+The other sections here are related to making custom filters so I am skipping those
+
+## Pipes
+
+Class with `@Injectable()` that implements `PipeTransform` interface
+
+What is it for?
+- transformation: turn input data into another form you want (str -> int)
+- validation: evaluate input data, valid? pass, invalid? throw exception
+
+Note: this happens after Exception Filter, but still before controller
+
+Pipes operate on `arg` in controller handler, pipe is before handler invoked
+1. pipe transform and validate
+2. then handler invoked
+
+NestJS has built-in pipes out-of-the-box (you can make custom too)
+- here we show the built-ins
+- and how to bind to handlers
+- and how to make custom pipe yourself
+
+note:
+- pipes are ran in exception zone
+- pipe throws exception, exception are handled by exception filter or global exception
+- so if pipe throw, no handler in invoked
+
+Built-in pipes
+- there are 9 pipes (from `@nestjs/common`), check them out here
+- [Ref](https://docs.nestjs.com/pipes)
+
+Taking a look at `ParseIntPipe`, lets transform input
+- pipe ensures handler param is turned to JavaScript int (throws on failed)
+- this applies to other pipes
+
+Binding pipes
+bind pipe instance, for `ParseIntPipe` bind to handler, it runs before the method, the construct, bind pipe at method param level
+- this one passes a class, instance is done by framework and enables dependency injection
+- can pass instance, good to customize built-in behavior by passing options
+- can also use this for validating route param (user/id), query string's parameters (?name=asd&age=12) or validate req body
+```ts
+@Get(':id')
+async findOne(@Param('id', ParseIntPipe) id: number) {
+  return this.catsService.findOne(id);
+}
+```
+ensures 1 of these 2 conditions are true
+- `findOne()` gets number
+- exception thrown before handler called
+
+If we do this
+```
+GET localhost:3000/abc
+```
+
+then the err is
+```json
+{
+  "statusCode": 400,
+  "message": "Validation failed (numeric string is expected)",
+  "error": "Bad Request"
+}
+```
+
+and that does not run `findOne()`
+
+can pass instance instead, good to customize built-in behavior by passing options
+```ts
+@Get(':id')
+async findOne(
+  @Param('id', new ParseIntPipe({ errorHttpStatusCode: HttpStatus.NOT_ACCEPTABLE }))
+  id: number,
+) {
+  return this.catsService.findOne(id);
+}
+```
+
+The above are method param level binded pipe for route param
+This one is for query string's param (?age=1&level=2)
+```ts
+@Get()
+async findOne(@Query('id', ParseIntPipe) id: number) {
+  return this.catsService.findOne(id);
+}
+```
+
+Or check for uuid
+```ts
+@Get(':uuid')
+async findOne(@Param('uuid', new ParseUUIDPipe()) uuid: string) {
+  return this.catsService.findOne(uuid);
+}
+```
+note
+- When using ParseUUIDPipe() you are parsing UUID in version 3, 4 or 5
+- pass options to pipe to get specific uuid version
+
+Binding validation pipes is a little bit different; we'll discuss that in the following section
+- [read this for examples of validation techniques with pipes](https://docs.nestjs.com/techniques/validation)
+
+Custom pipes
+Good for
+- input req to create handler method is valid, given the following
+```ts
+export class CreateCatDto {
+  name: string;
+  age: number;
+  breed: string;
+}
+```
+and this
+```ts
+@Post()
+async create(@Body() createCatDto: CreateCatDto) {
+  this.catsService.create(createCatDto);
+}
+```
+
+This is how you make custom pipe
+- need to use `transform()` method to fullfill `PipeTransform` interface contract, has 2 param
+- value
+- metadata
+```ts
+import { PipeTransform, Injectable, ArgumentMetadata } from '@nestjs/common';
+
+@Injectable()
+export class ValidationPipe implements PipeTransform {
+  transform(value: any, metadata: ArgumentMetadata) {
+    return value;
+  }
+}
+```
+Note
+- PipeTransform<T, R> is a generic interface that must be implemented by any pipe. The generic interface uses T to indicate the type of the input value, and R to indicate the return type of the transform() method.
+
