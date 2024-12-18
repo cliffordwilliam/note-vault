@@ -1037,8 +1037,8 @@ async create(@Body() createCatDto: CreateCatDto) {
 
 This is how you make custom pipe
 - need to use `transform()` method to fullfill `PipeTransform` interface contract, has 2 param
-- value
-- metadata
+- value: method arg before going to handler
+- metadata: method's arg metadata
 ```ts
 import { PipeTransform, Injectable, ArgumentMetadata } from '@nestjs/common';
 
@@ -1052,3 +1052,71 @@ export class ValidationPipe implements PipeTransform {
 Note
 - PipeTransform<T, R> is a generic interface that must be implemented by any pipe. The generic interface uses T to indicate the type of the input value, and R to indicate the return type of the transform() method.
 
+The metadata (method's arg metadata) props
+```ts
+export interface ArgumentMetadata {
+  type: 'body' | 'query' | 'param' | 'custom';
+  metatype?: Type<unknown>;
+  data?: string;
+}
+```
+- type: if arg is body? query? or param? (or custom)
+- metatype: str? val is undefined if you omit type declaration in route handler method signature (or in vanilla JavaScript)
+- data: str passed to decorator like `@Body('string'), its undefined if you leave the decor empty
+
+The rest of this is about schema based validation with zod, since I plan on using prisma, this is irrelevant to me since prisma schema validation is different, so I skip this
+
+Some extra notes
+- can make a global pipe, used for all controller and handler, cannot inject dependencies
+- use transformation to change str to int for handler, req might be missing, apply default vals with this, between client and handler
+  - or select existing user from existing user from db, use pipe to abstract the find logic
+  - to handle endpoint have missing query string param vals, can use a pipe to inject val before the other pipe work on it
+ 
+## Guards
+
+Class wtih `@Injectable()` that implements `CanActivate` interface
+
+What is this for?
+- 1 job
+  - determine if req will be handled by route or not (based on condition like permissions, roles at run-time)
+    - authorization (recommended)
+   
+here we do not use middleware for authorization
+- middleware is good for authentication (it does not need to know which route will get this thing that it had attached prop after validation)
+- but middleware is dumb, does not know which handler gets it after it
+  - BUT
+  - Guards have `ExecutionContext`, it knows who is next handler
+    - designed like exception filer, pipe
+      - where it interpose (position) logic in right place
+     
+Note:
+- Guards are ran after all middleware, but before any interceptor or pipe
+
+TODO
+
+## Interceptor
+
+Class wtih `@Injectable()` that implements `NestInterceptor` interface
+
+What is it for?
+- bind extra logic before / after method execution
+- transform function output
+- transform exception thrown from func
+- extend func behaviour
+- override func depending on conditions, for cache
+
+Not sure if I need this
+
+TODO
+
+## Custom decorators
+
+This covers Nest provided param decors, to be used with handlers
+
+TODO
+
+Not sure if I need this also
+
+---
+
+I am done with this note, I think this give good enough overview what NestJS is in case I forget
